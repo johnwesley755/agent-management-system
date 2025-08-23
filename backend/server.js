@@ -19,12 +19,13 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
   cors({
     origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
+      "http://localhost:5173",
       "https://agent-management-system-dun.vercel.app",
     ],
     credentials: true,
   })
 );
+  
   
 // Routes
 app.use("/api/auth", require("./routes/auth"));
