@@ -4,9 +4,10 @@ import axios from "axios";
 // const API_BASE_URL = 'http://localhost:5000/api';
 
 const API_BASE_URL =
-  process.env.NODE_ENV === "production"
+import.meta.env.PROD
     ? "https://agent-management-system-o5eb.onrender.com/api"
     : "http://localhost:5000/api";
+
 
 // Create axios instance
 const api = axios.create({
