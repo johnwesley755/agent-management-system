@@ -1,24 +1,92 @@
-# Logs
-logs
-*.log
+# Operating System & Editor Specific
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.bak
+*.tmp
+*~
+.editorconfig
+
+# Node.js (Frontend & Backend)
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+.pnp.*
+.env
 
-node_modules
-dist
-dist-ssr
-*.local
+# Python (Backend)
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Java (Backend)
+target/
+.gradle/
+build/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+.project
+.classpath
+.settings/
+
+# PHP (Backend)
+vendor/
+composer.lock
+.env
+
+# Ruby (Backend)
+vendor/bundle/
+.bundle/
+Gemfile.lock
+
+# Database
+*.sqlite3
+*.db
+*.sql
+*.log
+
+# Build Artifacts & Logs
+dist/
+build/
+coverage/
+log/
+tmp/
+*.log
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE Specific (more comprehensive)
+# Add specific IDE patterns if not covered above
+# e.g., for JetBrains IDEs:
+# .idea/
+# *.iml
+
+# Other common ignores
+# Compiled files
+*.o
+*.a
+*.so
+*.dll
+*.exe
+
+# Temporary files
+temp/
+*.tmp
+
+# User-specific files
+*.user

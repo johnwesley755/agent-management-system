@@ -1,17 +1,13 @@
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const { validationResult } = require("express-validator");
-const User = require("../models/User");
-const {
-  sendEmail,
-  getWelcomeEmailTemplate,
-  getPasswordResetTemplate,
-} = require("../config/email");
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { validationResult } = require('express-validator');
+const User = require('../models/User');
+const { sendEmail, getWelcomeEmailTemplate, getPasswordResetTemplate } = require('../config/email');
 
 // Generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE,
+    expiresIn: process.env.JWT_EXPIRE
   });
 };
 
@@ -35,9 +31,7 @@ exports.register = async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "User with this email already exists" });
+      return res.status(400).json({ message: 'User with this email already exists' });
     }
 
     // Create user
@@ -45,58 +39,57 @@ exports.register = async (req, res) => {
       name,
       email,
       password,
-      role: "admin",
+      role: 'admin'
     });
 
     // If sendWelcomeEmail is true, generate temp password and send email
     if (sendWelcomeEmail) {
       const tempPassword = generateTempPassword();
       user.password = tempPassword;
-
+      
       await user.save();
 
       // Send welcome email
       const emailTemplate = getWelcomeEmailTemplate(name, email, tempPassword);
       const emailResult = await sendEmail({
         to: email,
-        ...emailTemplate,
+        ...emailTemplate
       });
 
       if (!emailResult.success) {
-        console.error("Failed to send welcome email:", emailResult.error);
+        console.error('Failed to send welcome email:', emailResult.error);
       }
 
       res.status(201).json({
         success: true,
-        message:
-          "Admin user created successfully. Welcome email sent with temporary password.",
+        message: 'Admin user created successfully. Welcome email sent with temporary password.',
         user: {
           id: user._id,
           name: user.name,
           email: user.email,
-          role: user.role,
-        },
+          role: user.role
+        }
       });
     } else {
       await user.save();
-
+      
       const token = generateToken(user._id);
 
       res.status(201).json({
         success: true,
-        message: "Admin user created successfully",
+        message: 'Admin user created successfully',
         token,
         user: {
           id: user._id,
           name: user.name,
           email: user.email,
-          role: user.role,
-        },
+          role: user.role
+        }
       });
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -115,13 +108,13 @@ exports.login = async (req, res) => {
     // Check if user exists and is active
     const user = await User.findOne({ email, isActive: true });
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Update last login
@@ -139,12 +132,12 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        lastLogin: user.lastLogin,
-      },
+        lastLogin: user.lastLogin
+      }
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -166,8 +159,7 @@ exports.forgotPassword = async (req, res) => {
       // Don't reveal if user exists or not for security
       return res.json({
         success: true,
-        message:
-          "If an account with this email exists, a password reset link has been sent.",
+        message: 'If an account with this email exists, a password reset link has been sent.'
       });
     }
 
@@ -182,26 +174,24 @@ exports.forgotPassword = async (req, res) => {
     const emailTemplate = getPasswordResetTemplate(user.name, resetUrl);
     const emailResult = await sendEmail({
       to: user.email,
-      ...emailTemplate,
+      ...emailTemplate
     });
 
     if (!emailResult.success) {
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
       await user.save({ validateBeforeSave: false });
-
-      return res
-        .status(500)
-        .json({ message: "Email could not be sent. Try again later." });
+      
+      return res.status(500).json({ message: 'Email could not be sent. Try again later.' });
     }
 
     res.json({
       success: true,
-      message: "Password reset link sent to your email address.",
+      message: 'Password reset link sent to your email address.'
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -217,21 +207,19 @@ exports.resetPassword = async (req, res) => {
 
     // Hash the token from URL
     const hashedToken = crypto
-      .createHash("sha256")
+      .createHash('sha256')
       .update(req.params.token)
-      .digest("hex");
+      .digest('hex');
 
     // Find user with valid token
     const user = await User.findOne({
       passwordResetToken: hashedToken,
       passwordResetExpires: { $gt: Date.now() },
-      isActive: true,
+      isActive: true
     });
 
     if (!user) {
-      return res
-        .status(400)
-        .json({ message: "Token is invalid or has expired" });
+      return res.status(400).json({ message: 'Token is invalid or has expired' });
     }
 
     // Set new password
@@ -247,18 +235,18 @@ exports.resetPassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Password reset successful",
+      message: 'Password reset successful',
       token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-      },
+        role: user.role
+      }
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -280,7 +268,7 @@ exports.changePassword = async (req, res) => {
     // Check current password
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
-      return res.status(400).json({ message: "Current password is incorrect" });
+      return res.status(400).json({ message: 'Current password is incorrect' });
     }
 
     // Update password
@@ -289,11 +277,11 @@ exports.changePassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Password changed successfully",
+      message: 'Password changed successfully'
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -302,11 +290,11 @@ exports.changePassword = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -321,15 +309,12 @@ exports.updateProfile = async (req, res) => {
     }
 
     const { name, email } = req.body;
-
+    
     // Check if email is already taken by another user
     if (email !== req.user.email) {
-      const existingUser = await User.findOne({
-        email,
-        _id: { $ne: req.user.id },
-      });
+      const existingUser = await User.findOne({ email, _id: { $ne: req.user.id } });
       if (existingUser) {
-        return res.status(400).json({ message: "Email already in use" });
+        return res.status(400).json({ message: 'Email already in use' });
       }
     }
 
@@ -337,15 +322,15 @@ exports.updateProfile = async (req, res) => {
       req.user.id,
       { name, email },
       { new: true, runValidators: true }
-    ).select("-password");
+    ).select('-password');
 
     res.json({
       success: true,
-      message: "Profile updated successfully",
-      user,
+      message: 'Profile updated successfully',
+      user
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };

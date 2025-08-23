@@ -13,26 +13,27 @@ const createTransporter = () => {
   });
 };
 
-// Send email function
+// Send email function// Send email function
 const sendEmail = async (options) => {
-  const transporter = createTransport();
-
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: options.to,
-    subject: options.subject,
-    text: options.text,
-    html: options.html,
+    const transporter = createTransporter();
+  
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html,
+    };
+  
+    try {
+      await transporter.sendMail(mailOptions);
+      return { success: true };
+    } catch (error) {
+      console.error("Email sending error:", error);
+      return { success: false, error: error.message };
+    }
   };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    return { success: true };
-  } catch (error) {
-    console.error("Email sending error:", error);
-    return { success: false, error: error.message };
-  }
-};
+  
 
 // Email templates
 const getWelcomeEmailTemplate = (name, email, tempPassword) => {
