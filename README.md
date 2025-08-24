@@ -86,7 +86,7 @@ EMAIL_PORT=587
 EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASS=your-16-character-app-password
 EMAIL_FROM=noreply@yourdomain.com
-CLIENT_URL=http://localhost:3000
+CLIENT_URL=http://localhost:5173
 ```
 
 ---
@@ -174,7 +174,7 @@ EMAIL_PORT=587
 EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASS=your-app-password
 EMAIL_FROM=noreply@yourdomain.com
-CLIENT_URL=http://localhost:3000
+CLIENT_URL=http://localhost:5173
 ```
 
 ### 🔹 Run Application
@@ -189,7 +189,7 @@ cd ../frontend
 npm start
 ```
 
-Visit: **http://localhost:5000**
+Visit: **http://localhost:5173**
 
 ---
 
