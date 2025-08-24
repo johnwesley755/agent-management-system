@@ -8,9 +8,13 @@ import {
   UserPlus,
   Sparkles,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // Import useNavigate
+import { authAPI } from "@/services/api";
+// import { toast } from "react-hot-toast"; // (Recommended) For better notifications
+
 
 const Register = () => {
+  const navigate = useNavigate(); // Initialize the navigate function
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -58,20 +62,46 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      alert(
-        formData.sendWelcomeEmail
-          ? "Account created! Check your email for login credentials."
-          : "Account created successfully! You would be redirected to dashboard."
-      );
-    }, 2000);
+    try {
+      // Create the payload from form data
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        sendWelcomeEmail: formData.sendWelcomeEmail,
+      };
+
+      // Make the actual API call
+      const { data } = await authAPI.register(payload);
+
+      // Handle the two registration scenarios from your backend
+      if (formData.sendWelcomeEmail) {
+        // Scenario 1: Welcome email sent with temp password
+        // Display a success message and let the user check their email.
+        alert(data.message); // Or use a nicer toast notification
+        navigate("/login"); // Redirect to login page
+      } else {
+        // Scenario 2: Standard registration with auto-login
+        // Store token and user data, then redirect to the dashboard.
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        navigate("/dashboard"); // Redirect to the dashboard
+      }
+    } catch (error) {
+      // Handle errors from the API (e.g., user already exists)
+      const message =
+        error.response?.data?.message ||
+        "Registration failed. Please try again.";
+      setErrors({ api: message }); // Display the error to the user
+      alert(message); // Or use a toast notification
+    } finally {
+      setIsLoading(false); // Stop the loading indicator in any case
+    }
   };
 
   const handleInputChange = (e) => {
@@ -312,14 +342,15 @@ const Register = () => {
           <div className="mt-8 text-center">
             <p className="text-gray-600 text-sm">
               Already have an account?{" "}
-              <Link to="/login" className="font-semibold text-purple-600 hover:text-purple-700 transition-colors duration-200">
+              <Link
+                to="/login"
+                className="font-semibold text-purple-600 hover:text-purple-700 transition-colors duration-200"
+              >
                 Login here
               </Link>
             </p>
           </div>
         </div>
-
- 
       </div>
     </div>
   );
