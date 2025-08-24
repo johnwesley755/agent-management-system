@@ -5,7 +5,6 @@
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
 ![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
 
 A **MERN stack application** to manage agents, their records, distributed lists, and CSV uploads with a **complete authentication system** (signup, login, forgot password, reset password, profile management).
 
@@ -128,13 +127,7 @@ CLIENT_URL=http://localhost:5173
 - **Backend:** Node.js, Express.js, Nodemailer, Bcrypt, Crypto
 - **Database:** MongoDB + Mongoose
 - **Auth:** JWT-based authentication
-- **UI:** Responsive forms + tables for data management
-
----
-
-## 🖼️ Screenshots
-
-*(Add screenshots of Dashboard, Agents tab, CSV upload, and Profile tab here)*
+- **UI:** Responsive forms + tables for data management.
 
 ---
 
@@ -189,7 +182,10 @@ cd ../frontend
 npm start
 ```
 
-Visit: **http://localhost:5173**
+**Local Development:** http://localhost:5173
+
+### 🌐 Live Demo
+**Deployed Application:** https://agent-management-system-dun.vercel.app/
 
 ---
 
@@ -284,15 +280,6 @@ The Agent Management System provides:
 - ✔️ **Distributed List Management**
 - ✔️ **Profile & Password Controls**
 - ✔️ **Mobile-Friendly Dashboards**
-
----
-
-## 🙏 Acknowledgments
-
-- React community for excellent documentation
-- MongoDB for robust database solutions
-- Node.js ecosystem for powerful backend tools
-- All contributors who helped improve this project
 
 ---
 
