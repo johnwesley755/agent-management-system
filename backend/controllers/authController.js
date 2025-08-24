@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
+const Agent = require('../models/Agent');
+const List = require('../models/List');
 const { sendEmail, getWelcomeEmailTemplate, getPasswordResetTemplate } = require('../config/email');
 
 // Generate JWT Token
@@ -338,5 +340,36 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+exports.deleteProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 1. Find all agents created by this user
+    const agentsToDelete = await Agent.find({ createdBy: userId }).select(
+      "_id"
+    );
+    const agentIds = agentsToDelete.map((agent) => agent._id);
+
+    // 2. Delete all lists associated with those agents
+    if (agentIds.length > 0) {
+      await List.deleteMany({ agentId: { $in: agentIds } });
+    }
+
+    // 3. Delete all the agents themselves
+    await Agent.deleteMany({ createdBy: userId });
+
+    // 4. Finally, delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      success: true,
+      message:
+        "Your account and all associated data have been permanently deleted.",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error while deleting profile." });
   }
 };

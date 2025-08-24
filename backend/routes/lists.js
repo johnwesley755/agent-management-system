@@ -1,6 +1,7 @@
 const express = require("express");
 const {
-  uploadCSV,
+  upload,
+  processAndDistributeCSV,
   getDistributedLists,
   getAgentLists,
 } = require("../controllers/listController");
@@ -8,16 +9,17 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-// All routes are protected
+// All routes in this file are protected and require authentication
 router.use(auth);
 
-// Upload and distribute CSV
-router.post("/upload", uploadCSV);
+// Route to upload and distribute a file
+// It first uses the 'upload' middleware, then the 'processAndDistributeCSV' controller
+router.post("/upload", upload, processAndDistributeCSV);
 
-// Get all distributed lists
+// Route to get all distributed lists for the logged-in user's agents
 router.get("/", getDistributedLists);
 
-// Get lists for specific agent
+// Route to get lists for a specific agent
 router.get("/agent/:agentId", getAgentLists);
 
 module.exports = router;

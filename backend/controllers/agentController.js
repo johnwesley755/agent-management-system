@@ -1,12 +1,17 @@
 const { validationResult } = require("express-validator");
 const Agent = require("../models/Agent");
+const List = require("../models/List"); // Make sure List model is imported if you cascade deletes
 
-// @desc    Get all agents
+// @desc    Get all agents for the logged-in admin
 // @route   GET /api/agents
 // @access  Private
 exports.getAgents = async (req, res) => {
   try {
-    const agents = await Agent.find({ isActive: true }).select("-password");
+    // SECURE: Filter agents by the logged-in user's ID
+    const agents = await Agent.find({
+      createdBy: req.user.id,
+      isActive: true,
+    }).select("-password");
     res.json(agents);
   } catch (error) {
     console.error(error);
@@ -14,7 +19,7 @@ exports.getAgents = async (req, res) => {
   }
 };
 
-// @desc    Create new agent
+// @desc    Create new agent for the logged-in admin
 // @route   POST /api/agents
 // @access  Private
 exports.createAgent = async (req, res) => {
@@ -26,12 +31,13 @@ exports.createAgent = async (req, res) => {
 
     const { name, email, mobile, password } = req.body;
 
-    // Check if agent already exists
-    const existingAgent = await Agent.findOne({ email });
+    // --- THIS IS THE FIX ---
+    // Check if an ACTIVE agent already exists with this email
+    const existingAgent = await Agent.findOne({ email, isActive: true });
     if (existingAgent) {
       return res
         .status(400)
-        .json({ message: "Agent with this email already exists" });
+        .json({ message: "An active agent with this email already exists" });
     }
 
     const agent = new Agent({
@@ -39,6 +45,7 @@ exports.createAgent = async (req, res) => {
       email,
       mobile,
       password,
+      createdBy: req.user.id, // SECURE: Assign ownership to the logged-in user
     });
 
     await agent.save();
@@ -59,7 +66,7 @@ exports.createAgent = async (req, res) => {
   }
 };
 
-// @desc    Update agent
+// @desc    Update an agent owned by the logged-in admin
 // @route   PUT /api/agents/:id
 // @access  Private
 exports.updateAgent = async (req, res) => {
@@ -71,6 +78,15 @@ exports.updateAgent = async (req, res) => {
       return res.status(404).json({ message: "Agent not found" });
     }
 
+    // SECURE: Check if the logged-in user owns this agent
+    if (agent.createdBy.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({
+          message: "Forbidden: You are not authorized to update this agent.",
+        });
+    }
+
     agent.name = name || agent.name;
     agent.email = email || agent.email;
     agent.mobile = mobile || agent.mobile;
@@ -80,12 +96,7 @@ exports.updateAgent = async (req, res) => {
     res.json({
       success: true,
       message: "Agent updated successfully",
-      agent: {
-        id: agent._id,
-        name: agent.name,
-        email: agent.email,
-        mobile: agent.mobile,
-      },
+      agent,
     });
   } catch (error) {
     console.error(error);
@@ -93,7 +104,7 @@ exports.updateAgent = async (req, res) => {
   }
 };
 
-// @desc    Delete agent
+// @desc    Delete an agent owned by the logged-in admin
 // @route   DELETE /api/agents/:id
 // @access  Private
 exports.deleteAgent = async (req, res) => {
@@ -103,8 +114,22 @@ exports.deleteAgent = async (req, res) => {
       return res.status(404).json({ message: "Agent not found" });
     }
 
+    // SECURE: Check if the logged-in user owns this agent
+    if (agent.createdBy.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({
+          message: "Forbidden: You are not authorized to delete this agent.",
+        });
+    }
+
+    // Option 1: Soft delete (current implementation)
     agent.isActive = false;
     await agent.save();
+
+    // Option 2: Hard delete (uncomment below to permanently delete)
+    // await List.deleteMany({ agentId: agent._id }); // Also delete their lists
+    // await Agent.findByIdAndDelete(req.params.id);
 
     res.json({ success: true, message: "Agent deleted successfully" });
   } catch (error) {

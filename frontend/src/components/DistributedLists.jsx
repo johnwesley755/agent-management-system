@@ -11,31 +11,65 @@ import {
   List,
   Eye,
   EyeOff,
+  SearchX,
+  Loader2,
 } from "lucide-react";
 import { listAPI } from "../services/api";
 
-const DistributedLists = () => {
-  const [lists, setLists] = useState([]);
+const DistributedLists = ({ searchQuery }) => {
+  const [allLists, setAllLists] = useState([]); // Holds the original, unfiltered data
+  const [filteredLists, setFilteredLists] = useState([]); // Holds the data to be displayed
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState(null);
 
+  // 1. Fetches all lists once when the component mounts
   useEffect(() => {
+    const fetchLists = async () => {
+      try {
+        const response = await listAPI.getAll();
+        setAllLists(response.data);
+      // eslint-disable-next-line no-unused-vars
+      } catch (error) {
+        toast.error("Failed to fetch distributed lists");
+      } finally {
+        setIsLoading(false);
+      }
+    };
     fetchLists();
   }, []);
 
-  const fetchLists = async () => {
-    try {
-      const response = await listAPI.getAll();
-      setLists(response.data);
-    } catch (error) {
-      toast.error("Failed to fetch distributed lists");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // 2. Filters the lists whenever the search query or the master list changes
+  useEffect(() => {
+    const lowercasedQuery = searchQuery ? searchQuery.toLowerCase() : "";
 
-  // Group lists by agent
-  const groupedLists = lists.reduce((acc, list) => {
+    if (!lowercasedQuery) {
+      setFilteredLists(allLists); // If search is empty, show all lists
+    } else {
+      const filtered = allLists.filter((list) => {
+        const agentName = list.agentId.name.toLowerCase();
+        const agentEmail = list.agentId.email.toLowerCase();
+        const fileName = list.fileName.toLowerCase();
+
+        // Check agent, file, and also check items inside the list
+        const hasMatchingItem = list.items.some(
+          (item) =>
+            item.firstName?.toLowerCase().includes(lowercasedQuery) ||
+            item.phone?.includes(lowercasedQuery)
+        );
+
+        return (
+          agentName.includes(lowercasedQuery) ||
+          agentEmail.includes(lowercasedQuery) ||
+          fileName.includes(lowercasedQuery) ||
+          hasMatchingItem
+        );
+      });
+      setFilteredLists(filtered);
+    }
+  }, [searchQuery, allLists]);
+
+  // 3. Group the *filtered* lists by agent for rendering
+  const groupedLists = filteredLists.reduce((acc, list) => {
     const agentId = list.agentId._id;
     if (!acc[agentId]) {
       acc[agentId] = {
@@ -49,23 +83,17 @@ const DistributedLists = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
-              <p className="text-gray-600 text-lg">
-                Loading distributed lists...
-              </p>
-            </div>
-          </div>
+      <div className="flex items-center justify-center min-h-64 p-6">
+        <div className="text-center space-y-4">
+          <Loader2 className="animate-spin h-12 w-12 text-purple-500 mx-auto" />
+          <p className="text-gray-600 text-lg">Loading distributed lists...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100 p-6">
+    <div className="p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
@@ -82,7 +110,18 @@ const DistributedLists = () => {
           </div>
         </div>
 
-        {Object.keys(groupedLists).length === 0 ? (
+        {/* Conditional Rendering for search results */}
+        {allLists.length > 0 && filteredLists.length === 0 ? (
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 p-12 text-center">
+            <SearchX className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+            <h3 className="text-2xl font-semibold text-gray-900">
+              No Results Found
+            </h3>
+            <p className="text-gray-600 mt-2">
+              Your search for "{searchQuery}" did not match any lists.
+            </p>
+          </div>
+        ) : Object.keys(groupedLists).length === 0 ? (
           <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 p-12">
             <div className="text-center space-y-6">
               <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full">
@@ -93,77 +132,51 @@ const DistributedLists = () => {
                   No distributed lists found
                 </h3>
                 <p className="text-gray-600 max-w-md mx-auto">
-                  Upload a CSV file to distribute items among agents and start
-                  managing your distributed lists.
+                  Upload a CSV file to begin.
                 </p>
               </div>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Summary Stats */}
+            {/* Summary Stats (now reflects filtered data) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Agents
-                    </p>
-                    <p className="text-3xl font-bold text-purple-600">
-                      {Object.keys(groupedLists).length}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full flex items-center justify-center">
-                    <Users className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
+                <p className="text-sm font-medium text-gray-600">
+                  Agents Found
+                </p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {Object.keys(groupedLists).length}
+                </p>
               </div>
-
               <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Files
-                    </p>
-                    <p className="text-3xl font-bold text-purple-600">
-                      {lists.length}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
+                <p className="text-sm font-medium text-gray-600">Files Found</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {filteredLists.length}
+                </p>
               </div>
-
               <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Items
-                    </p>
-                    <p className="text-3xl font-bold text-purple-600">
-                      {lists.reduce((sum, list) => sum + list.items.length, 0)}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full flex items-center justify-center">
-                    <List className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
+                <p className="text-sm font-medium text-gray-600">Items Found</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {filteredLists.reduce(
+                    (sum, list) => sum + list.items.length,
+                    0
+                  )}
+                </p>
               </div>
             </div>
 
-            {/* Agents Grid */}
+            {/* Agents Grid (renders the filtered and grouped data) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {Object.values(groupedLists).map(({ agent, lists }) => {
                 const totalItems = lists.reduce(
                   (sum, list) => sum + list.items.length,
                   0
                 );
-
                 return (
                   <div
                     key={agent._id}
-                    className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 overflow-hidden transition-all duration-300 hover:shadow-xl"
+                    className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border-0 overflow-hidden"
                   >
                     {/* Agent Header */}
                     <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6">
@@ -180,7 +193,6 @@ const DistributedLists = () => {
                           </p>
                         </div>
                       </div>
-
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white/10 rounded-lg p-3">
                           <p className="text-purple-100 text-xs uppercase tracking-wide">
@@ -200,11 +212,7 @@ const DistributedLists = () => {
                     {/* Agent Content */}
                     <div className="p-6">
                       <button
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                          selectedAgent === agent._id
-                            ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
                         onClick={() =>
                           setSelectedAgent(
                             selectedAgent === agent._id ? null : agent._id
@@ -233,7 +241,6 @@ const DistributedLists = () => {
                               <UserCheck className="w-5 h-5 text-purple-500" />
                               Assigned Items
                             </h5>
-
                             <div className="space-y-4 max-h-96 overflow-y-auto">
                               {lists.map((list) => (
                                 <div
@@ -249,7 +256,6 @@ const DistributedLists = () => {
                                       {list.items.length} items
                                     </span>
                                   </div>
-
                                   <div className="space-y-3">
                                     {list.items.map((item, index) => (
                                       <div

@@ -46,6 +46,7 @@ export const authAPI = {
   changePassword: (passwords) => api.put("/auth/change-password", passwords),
   getMe: () => api.get("/auth/me"),
   updateProfile: (data) => api.put("/auth/profile", data),
+  deleteProfile: () => api.delete("/auth/profile"),
 };
 
 export const agentAPI = {

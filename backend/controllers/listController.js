@@ -6,194 +6,176 @@ const path = require("path");
 const Agent = require("../models/Agent");
 const List = require("../models/List");
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    "text/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ];
-
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only CSV, XLS, and XLSX files are allowed"), false);
-  }
-};
-
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-}).single("csvFile");
-
-// Parse CSV file
+// Helper function to parse CSV files
 const parseCSV = (filePath) => {
   return new Promise((resolve, reject) => {
-    const results = [];
+    const items = [];
     fs.createReadStream(filePath)
       .pipe(csv())
-      .on("data", (data) => {
-        // Validate required fields
-        if (data.FirstName && data.Phone) {
-          results.push({
-            firstName: data.FirstName.trim(),
-            phone: data.Phone.toString().trim(),
-            notes: data.Notes ? data.Notes.trim() : "",
-          });
-        }
-      })
-      .on("end", () => resolve(results))
-      .on("error", reject);
+      .on("data", (row) => items.push(row))
+      .on("end", () => resolve(items))
+      .on("error", (error) => reject(error));
   });
 };
 
-// Parse Excel file
+// Helper function to parse Excel files
 const parseExcel = (filePath) => {
-  try {
-    const workbook = xlsx.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(sheet);
-
-    return data
-      .map((row) => ({
-        firstName: row.FirstName ? row.FirstName.toString().trim() : "",
-        phone: row.Phone ? row.Phone.toString().trim() : "",
-        notes: row.Notes ? row.Notes.toString().trim() : "",
-      }))
-      .filter((item) => item.firstName && item.phone);
-  } catch (error) {
-    throw new Error("Error parsing Excel file");
-  }
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+  return xlsx.utils.sheet_to_json(worksheet);
 };
 
-// Distribute items among agents
+// Helper function to distribute items among agents
 const distributeItems = (items, agents) => {
-  const itemsPerAgent = Math.floor(items.length / agents.length);
-  const remainder = items.length % agents.length;
-
-  const distribution = [];
-  let currentIndex = 0;
-
-  agents.forEach((agent, index) => {
-    const itemCount = itemsPerAgent + (index < remainder ? 1 : 0);
-    const agentItems = items.slice(currentIndex, currentIndex + itemCount);
-
-    distribution.push({
-      agentId: agent._id,
-      items: agentItems,
-    });
-
-    currentIndex += itemCount;
+  const distribution = agents.map((agent) => ({
+    agentId: agent._id,
+    items: [],
+  }));
+  items.forEach((item, index) => {
+    distribution[index % agents.length].items.push(item);
   });
-
   return distribution;
 };
 
-// @desc    Upload and distribute CSV
+// This is the 'upload' middleware, configured and exported directly
+exports.upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadPath = path.join(__dirname, "../uploads");
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "text/csv",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only CSV, XLS, and XLSX files are allowed"), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+}).single("csvFile");
+
+// @desc    Process and distribute uploaded file
 // @route   POST /api/lists/upload
 // @access  Private
-exports.uploadCSV = async (req, res) => {
-  upload(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ message: err.message });
+exports.processAndDistributeCSV = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  const filePath = req.file.path;
+  try {
+    const fileName = req.file.originalname;
+    let parsedItems = [];
+
+    if (fileName.endsWith(".csv")) {
+      parsedItems = await parseCSV(filePath);
+    } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+      parsedItems = parseExcel(filePath);
     }
 
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
+    // --- NEW: DATA MAPPING LOGIC ---
+    // This makes the upload more flexible by checking for common header variations.
+    const items = parsedItems.map((item) => {
+      const mappedItem = {};
+      // Find the key for firstName (case-insensitive, ignores spaces)
+      const firstNameKey = Object.keys(item).find(
+        (k) => k.toLowerCase().replace(/\s/g, "") === "firstname"
+      );
+      // Find the key for phone (case-insensitive, ignores spaces, checks for 'phone number')
+      const phoneKey = Object.keys(item).find(
+        (k) =>
+          k.toLowerCase().replace(/\s/g, "") === "phone" ||
+          k.toLowerCase().replace(/\s/g, "") === "phonenumber"
+      );
+      // Find the key for notes (case-insensitive, ignores spaces)
+      const notesKey = Object.keys(item).find(
+        (k) => k.toLowerCase().replace(/\s/g, "") === "notes"
+      );
+
+      if (firstNameKey) mappedItem.firstName = item[firstNameKey];
+      if (phoneKey) mappedItem.phone = item[phoneKey];
+      if (notesKey) mappedItem.notes = item[notesKey];
+
+      return mappedItem;
+    });
+
+    if (items.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "No valid data found in the file" });
     }
 
-    try {
-      const filePath = req.file.path;
-      const fileName = req.file.originalname;
-      let items = [];
-
-      // Parse file based on extension
-      if (fileName.endsWith(".csv")) {
-        items = await parseCSV(filePath);
-      } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
-        items = parseExcel(filePath);
-      }
-
-      if (items.length === 0) {
-        fs.unlinkSync(filePath); // Clean up uploaded file
-        return res
-          .status(400)
-          .json({ message: "No valid data found in the file" });
-      }
-
-      // Get active agents
-      const agents = await Agent.find({ isActive: true }).limit(5);
-      if (agents.length === 0) {
-        fs.unlinkSync(filePath);
-        return res.status(400).json({ message: "No active agents found" });
-      }
-
-      // Distribute items among agents
-      const distribution = distributeItems(items, agents);
-
-      // Save distributed lists to database
-      const savedLists = [];
-      for (const dist of distribution) {
-        const list = new List({
-          agentId: dist.agentId,
-          items: dist.items,
-          fileName,
+    const agents = await Agent.find({ createdBy: req.user.id, isActive: true });
+    if (agents.length === 0) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "No active agents found for your account. Please add an agent first.",
         });
-
-        await list.save();
-        savedLists.push(list);
-      }
-
-      // Clean up uploaded file
-      fs.unlinkSync(filePath);
-
-      res.json({
-        success: true,
-        message: "File uploaded and distributed successfully",
-        totalItems: items.length,
-        agentsCount: agents.length,
-        distribution: savedLists.map((list) => ({
-          agentId: list.agentId,
-          itemCount: list.items.length,
-        })),
-      });
-    } catch (error) {
-      console.error(error);
-      // Clean up uploaded file on error
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      res.status(500).json({ message: "Error processing file" });
     }
-  });
+
+    const distribution = distributeItems(items, agents);
+
+    for (const dist of distribution) {
+      const list = new List({
+        agentId: dist.agentId,
+        items: dist.items,
+        fileName,
+      });
+      await list.save();
+    }
+
+    res.json({
+      success: true,
+      message: "File uploaded and distributed successfully",
+      totalItems: items.length,
+      agentsCount: agents.length,
+    });
+  } catch (error) {
+    console.error(error);
+    // NEW: Improved error handling for validation issues
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Validation failed. Ensure your file contains valid data for 'firstName' and 'phone' columns.",
+        });
+    }
+    res.status(500).json({ message: "Error processing file" });
+  } finally {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
 };
 
-// @desc    Get distributed lists
+// @desc    Get distributed lists for the admin's own agents
 // @route   GET /api/lists
 // @access  Private
 exports.getDistributedLists = async (req, res) => {
   try {
-    const lists = await List.find()
+    const userAgents = await Agent.find({ createdBy: req.user.id }).select(
+      "_id"
+    );
+    const agentIds = userAgents.map((agent) => agent._id);
+    const lists = await List.find({ agentId: { $in: agentIds } })
       .populate("agentId", "name email")
       .sort({ createdAt: -1 });
-
     res.json(lists);
   } catch (error) {
     console.error(error);
@@ -201,15 +183,23 @@ exports.getDistributedLists = async (req, res) => {
   }
 };
 
-// @desc    Get lists for specific agent
+// @desc    Get lists for a specific agent, ensuring it's owned by the admin
 // @route   GET /api/lists/agent/:agentId
 // @access  Private
 exports.getAgentLists = async (req, res) => {
   try {
+    const agent = await Agent.findOne({
+      _id: req.params.agentId,
+      createdBy: req.user.id,
+    });
+    if (!agent) {
+      return res
+        .status(403)
+        .json({ message: "Access denied: You do not own this agent." });
+    }
     const lists = await List.find({ agentId: req.params.agentId })
       .populate("agentId", "name email")
       .sort({ createdAt: -1 });
-
     res.json(lists);
   } catch (error) {
     console.error(error);
