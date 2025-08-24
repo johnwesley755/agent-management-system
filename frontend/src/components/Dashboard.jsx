@@ -18,7 +18,7 @@ import {
   X,
   Database,
 } from "lucide-react";
-
+import { authAPI } from "@/services/api";
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("agents");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -26,8 +26,15 @@ const Dashboard = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const user = getUser();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout(); // Call the backend logout endpoint
+    } catch (error) {
+      // Log error but still proceed with client-side logout
+      console.error("Server logout failed:", error);
+    } finally {
+      logout(); // This function from utils/auth will clear local storage and redirect
+    }
   };
 
   const handleSearch = (e) => {

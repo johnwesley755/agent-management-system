@@ -188,13 +188,7 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-xs text-gray-500">
-            Secure admin portal - Your data is protected with enterprise-grade
-            security
-          </p>
-        </div>
+      
       </div>
     </div>
   );

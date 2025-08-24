@@ -140,7 +140,13 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
+// authController.js
+exports.logout = (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Logged out successfully'
+  });
+};
 // @desc    Forgot password
 // @route   POST /api/auth/forgot-password
 // @access  Public

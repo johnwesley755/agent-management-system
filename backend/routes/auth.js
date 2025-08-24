@@ -3,6 +3,7 @@ const { body } = require("express-validator");
 const {
   register,
   login,
+  logout,
   forgotPassword,
   resetPassword,
   changePassword,
@@ -46,7 +47,8 @@ router.post(
   ],
   login
 );
-
+router.use(auth);
+router.post("/logout", logout);
 // Forgot password route
 router.post(
   "/forgot-password",

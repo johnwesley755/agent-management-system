@@ -185,12 +185,7 @@ const ForgotPassword = () => {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-xs text-gray-500">
-            Having trouble? Contact our support team for assistance
-          </p>
-        </div>
+    
       </div>
     </div>
   );
